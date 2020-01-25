@@ -1,0 +1,180 @@
+---
+title: "MBX Notebook"
+author: "Matthew Hirschey"
+date: "`r Sys.Date()`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+  html_document:
+    df_print: paged
+    toc: yes
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook from the [Hirschey lab](http://www.hirscheylab.org).
+
+## Load libraries
+```{r message=FALSE, warning=FALSE}
+library(tidyverse) # for base packages
+library(readr)
+library(janitor) # clean data
+library(viridis) # For awesome, accessible color palettes
+library(ggrepel) #for smart ggplot labels
+library(broom) #for stats
+library(here)
+
+```
+
+## Load dataset
+Pull data from master excel spreadsheet
+```{r}
+etoh <- read_csv(here::here("data", "2020_01", "test.csv"), trim_ws = TRUE) %>% 
+  clean_names() %>% #already clean, probalby don't need.
+  remove_empty(c("rows", "cols")) %>% #just in case, hard to know if there are empties
+  select(contains("metabolites"), starts_with("ii")) 
+head(etoh, n = 10)
+```
+#transpose
+```{r}
+etoh <- etoh %>% 
+   gather(sample, value, -metabolites) %>% 
+   spread(metabolites, value)
+head(etoh)
+```
+#add factor level group ids as new column
+
+```{r}
+etoh <- mutate(etoh, group_id = 
+                  ifelse(grepl("ii_c", sample), "control",
+                  ifelse(grepl("ii_et_oh", sample), "ethanol", 
+                  ifelse(grepl("ii_nmn_", sample), "nmn_ethanol", "nmn"))))
+```
+#log transform
+```{r}
+etoh_log <- etoh %>%
+  map_if(., is.numeric, log2) %>% 
+  as.tibble()
+
+```
+
+
+#calculate mean, and then normalize each mean
+```{r}
+#make a 'flat' group a, vector to then operate the 'mean' funtion on
+etoh_log_mean_control <- etoh_log %>%
+  filter(group_id == "control") %>%
+  summarize_if(is.numeric, mean) %>% 
+  flatten_dbl()
+etoh_log_mean_control
+
+#mutate all values by divinding by mean of 'a', and then re-bind to group ID
+etoh_log_rel <- etoh_log %>%
+  select_if(is.numeric) %>%
+  map2(., etoh_log_mean_control, ~ .x - .y) %>%
+  bind_cols(select(etoh_log, group_id), .)
+etoh_log_rel
+
+#calculate avg
+etoh_log_rel_mean <- etoh_log_rel %>% 
+  group_by(group_id) %>% 
+  summarize_all(funs(mean))
+etoh_log_rel_mean
+
+#long data for plotting
+etoh_log_plot <- etoh_log_rel_mean %>% 
+  gather(key = "metabolite", value = "normalized_nmn", -group_id) %>% 
+  arrange(desc(normalized_nmn))
+
+etoh_log_plot$metabolite <- as.factor(etoh_log_plot$metabolite)
+etoh_log_plot$group_id <- as.factor(etoh_log_plot$group_id)
+
+
+#plot relative log2 fold change
+etoh_log_plot %>% 
+  filter(group_id == "ethanol") %>% 
+  mutate(metabolite = fct_reorder(metabolite, normalized_nmn)) %>% 
+  ggplot(aes(x = metabolite, y = normalized_nmn)) +
+  geom_point(alpha = 0.5)
+
+#check re-order, top/bottom
+etoh_log_plot %>% filter(group_id == "ethanol") %>% head(plot, n = 10)
+etoh_log_plot %>% filter(group_id == "ethanol") %>% tail(plot, n = 10)
+```
+#calculate p-values, then correct for FDR
+```{r}
+#pvalue
+etoh_p <- etoh %>%
+  filter(group_id =="control" | group_id == "ethanol") %>% 
+  select(-sample) %>% 
+  gather(metabolite, value, -group_id) %>% #Gather the columns into rows.
+  group_by(metabolite) %>% #Group it by variable (which now contains meta1, meta2, metax)
+  nest() %>% #Nest all non-grouping columns into list-frames
+  mutate(t_test = map(data, ~tidy(t.test(value ~ group_id, data = .x)))) %>% #Create a new variable called t_test with `mutate` assign it the value resulting from maping the function `t.test` over each element of data, using the formula interface to run `value ~ group_id`.  Use `tidy` to format  that result into a data frame.
+  unnest(t_test) %>%  #Unnest the `t_test` list column into the regular data frame.
+  select(one_of(c("metabolite", "p.value"))) %>% 
+  arrange(p.value)
+
+#fdr
+etoh_p <- etoh_p %>%
+  mutate(q.value = p.adjust(p.value, method = "fdr"))
+```
+
+#join p.value and logFC tables
+```{r}
+etoh_plot <- etoh_log_plot %>% 
+  filter(group_id == "ethanol") %>% 
+  left_join(etoh_p, by = "metabolite")
+```
+
+#plot final
+```{r}
+#make labels df
+sig <- etoh_plot %>% 
+  filter(normalized_nmn <= -1.5 | normalized_nmn >= 1.5) %>% 
+  filter(q.value < 0.05)
+
+#plot relative log2 fold change vs. p.value
+ggplot(etoh_plot) +
+  geom_hline(aes(yintercept = 1.30103), linetype = "dotted") + #FDR p.value 0.05
+  geom_vline(aes(xintercept = 1), linetype = "dotted") + #2FC
+  geom_vline(aes(xintercept = -1), linetype = "dotted") + #-2FC
+  geom_vline(aes(xintercept = 0)) + #bold axis
+  geom_hline(aes(yintercept = 0)) + #bold axis
+  geom_point(aes(x = normalized_nmn, y = -log(q.value, 10), fill = normalized_nmn), alpha = 0.8, size = 4, shape = 21, color = "black") +
+  geom_label_repel(data = sig, aes(x = normalized_nmn, y = -log(q.value, 10), label = metabolite), alpha = 0.8, size = 3, segment.size = 0.3, point.padding = 0.8) +
+  scale_fill_viridis(option = "viridis", direction = 1, name = expression("Log"[2]*"FC")) +
+  labs(x = expression("Relative fold change (log"[2]*") compared to control"), 
+       y = expression("-Log "[10]*" FDR-corrected p-value"), 
+       title = "Hepatic metabolite profiling from control vs. ethanol-fed mice") +
+  theme_bw() + 
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank()
+  ) 
+
+```
+#save
+```{r}
+ggsave("etoh.png", plot = last_plot(), height = 6, width = 8, units = "in", dpi = 600)
+```
+
+```{r}
+#test case
+df <- tibble::tribble(
+    ~group_id, ~meta1, ~meta2, ~meta3, "a", 2, 3, 6, "a", 4, 5, 8, "a", 3, 5, 9, "b", 3, 8, 1, "b", 3, 4, 1, "b", 2, 2, 2)
+
+df %>% 
+  gather(variable, value, -group_id) %>% #Gather the columns into rows.
+  group_by(variable) %>% #Group it by variable (which now contains meta1, meta2, metax)
+  nest() %>% #Nest all non-grouping columns into list-frames
+  mutate(t_test = map(data, ~tidy(t.test(value ~ group_id, data = .x)))) %>% #Create a new variable called t_test with `mutate` assign it the value resulting from maping the function `t.test` over each element of data, using the formula interface to run `value ~ group_id`.  Use `tidy` to format  that result into a data frame.
+  unnest(t_test) %>%  #Unnest the `t_test` list column into the regular data frame.
+  select(one_of(c("variable", "p.value"))) %>% 
+  arrange(p.value)
+
+
+```
+
