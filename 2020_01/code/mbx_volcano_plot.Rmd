@@ -28,7 +28,7 @@ library(here)
 ## Load dataset
 Pull data from master excel spreadsheet
 ```{r}
-etoh <- read_csv(here::here("data", "2020_01", "test.csv"), trim_ws = TRUE) %>% 
+etoh <- read_csv(here::here("2020_01", "data", "test.csv"), trim_ws = TRUE) %>% 
   clean_names() %>% #already clean, probalby don't need.
   remove_empty(c("rows", "cols")) %>% #just in case, hard to know if there are empties
   select(contains("metabolites"), starts_with("ii")) 

@@ -1,0 +1,266 @@
+---
+title: "Building a Volcano Plot from Non-targeted MBX Analysis of Cells"
+author: "Matthew Hirschey"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook from the [Hirschey lab](http://www.hirscheylab.org) to generate a volcano plot from non-targeted metabolomic data.
+
+## Load libraries
+```{r message=FALSE, warning=FALSE}
+library(tidyverse) # for base packages
+library(janitor) # clean data
+library(viridis) # For awesome, accessible color palettes
+library(ggrepel) #for smart ggplot labels
+library(broom) #for stats
+library(beepr) #beep
+
+#clear environment
+#rm(list=ls()) 
+
+#Set theme
+theme_set(theme_light())
+
+```
+
+## Load dataset
+Pull data from master excel spreadsheet
+```{r}
+data_raw <- read_csv(here::here("2020_01", "data", "Allie-4-13-2019.csv"), col_names = TRUE, trim_ws = TRUE) %>% 
+  clean_names() %>% #already clean, probalby don't need.
+  remove_empty(c("rows", "cols")) %>% #just in case, hard to know if there are empties
+  select(contains("metabolite"), starts_with("ii")) 
+head(data_raw, n = 10)
+```
+#transpose
+```{r}
+sirt5 <- data_raw %>% 
+  pivot_longer(-metabolite, names_to = "sample", values_to = "value") %>% 
+  pivot_wider(id_cols = "sample", names_from = "metabolite", values_from = "value")
+
+head(sirt5)
+
+```
+
+#add factor level group ids as new column
+
+```{r}
+sirt5 <- mutate(sirt5, group_id = 
+                  case_when(
+                    str_detect(sample, "tfed") ~ "wt_fed", 
+                    str_detect(sample, "ofed") ~ "ko_fed", 
+                    str_detect(sample, "wt_starve") ~ "wt_starve", 
+                    str_detect(sample, "ko_starve") ~ "ko_starve", 
+                    str_detect(sample, "wt_refed") ~ "wt_refed", 
+                    TRUE ~ "ko_refed")
+                ) %>% 
+  select(sample, group_id, everything())
+
+head(sirt5)
+```
+#log transform
+```{r}
+sirt5_log <- sirt5 %>%
+  map_if(., is.numeric, log2) %>% 
+  as_tibble()
+```
+
+#calculate mean, and then normalize each mean
+```{r}
+#make a 'flat' group a, vector to then operate the 'mean' funtion on
+sirt5_log_mean_control <- sirt5_log %>%
+  filter(group_id == "wt_fed") %>%
+  summarize_if(is.numeric, mean) %>% 
+  flatten_dbl()
+sirt5_log_mean_control
+
+#mutate all values by divinding by mean of 'control', and then re-bind to group ID
+sirt5_log_rel <- sirt5_log %>%
+  select_if(is.numeric) %>%
+  map2(., sirt5_log_mean_control, ~ .x - .y) %>% #subtract becuase it's log space
+  bind_cols(select(sirt5_log, group_id), .)
+sirt5_log_rel
+
+#calculate avg
+sirt5_log_rel_mean <- sirt5_log_rel %>% 
+  group_by(group_id) %>% 
+  summarize_if(., is.numeric, funs(mean))
+sirt5_log_rel_mean
+
+#add genotype and condition factors back in
+sirt5_log_rel_mean <- sirt5_log_rel_mean %>% 
+  mutate(genotype_id = 
+           ifelse(str_detect(group_id, "wt"), "wt", 
+                  "ko"))
+sirt5_log_rel_mean <- sirt5_log_rel_mean %>% 
+  mutate(status_id = 
+            ifelse(str_detect(group_id, "refed"), "refed", 
+            ifelse(str_detect(group_id, "starve"), "starved", 
+                   "fed"))) #order is important to differentiate str_detect 'fed' and 'refed', which contains 'fed' w/i
+
+#reorder
+sirt5_log_rel_mean <- sirt5_log_rel_mean %>% 
+  select(group_id, genotype_id, status_id, everything())
+
+
+#long data for plotting
+sirt5_log_plot <- sirt5_log_rel_mean %>% 
+  pivot_longer(cols = -ends_with("_id"), names_to = "metabolite", values_to = "normalized_control") %>% 
+  #gather(key = "metabolite", value = "normalized_control", 4:279) %>% 
+  arrange(desc(normalized_control))
+
+sirt5_log_plot$metabolite <- as.factor(sirt5_log_plot$metabolite)
+sirt5_log_plot$group_id <- as.factor(sirt5_log_plot$group_id)
+sirt5_log_plot$genotype_id <- as.factor(sirt5_log_plot$genotype_id)
+sirt5_log_plot$status_id <- as.factor(sirt5_log_plot$status_id)
+
+#sirt5_log_plot contains all log transformed, normalized (to wt_fed) data!!!
+```
+#exploratory
+```{r}
+#plot relative log2 fold change
+sirt5_log_plot %>% 
+  filter(group_id == "ko_fed") %>% 
+  mutate(metabolite = fct_reorder(metabolite, normalized_control)) %>% 
+  ggplot(aes(x = metabolite, y = normalized_control)) +
+  geom_point(alpha = 0.5)
+
+#check re-order, top/bottom
+sirt5_log_plot %>% filter(group_id == "ko_fed") %>% head(plot, n = 10)
+sirt5_log_plot %>% filter(group_id == "ko_fed") %>% tail(plot, n = 10)
+```
+
+#calculate p-values, then correct for FDR
+```{r}
+#pvalue
+sirt5_p <- sirt5 %>%
+  filter(group_id =="wt_fed" | group_id == "ko_fed") %>% 
+  select(-sample) %>% 
+  pivot_longer(cols = -group_id, names_to = "metabolite", values_to = "value") %>% #Gather the columns into rows.
+  group_by(metabolite) %>% #Group it by variable (which now contains meta1, meta2, metax)
+  nest() %>% #Nest all non-grouping columns into list-frames
+  mutate(t_test = map(data, ~tidy(t.test(value ~ group_id, data = .x)))) %>% #Create a new variable called t_test with `mutate` assign it the value resulting from maping the function `t.test` over each element of data, using the formula interface to run `value ~ group_id`.  Use `tidy` to format  that result into a data frame.
+  unnest(t_test) %>%  #Unnest the `t_test` list column into the regular data frame.
+  select(one_of(c("metabolite", "p.value"))) %>% 
+  arrange(p.value)
+
+#fdr
+sirt5_p <- sirt5_p %>%
+  mutate(q.value = p.adjust(p.value, method = "fdr"))
+```
+
+#join p.value and logFC tables
+```{r}
+sirt5_plot <- sirt5_log_plot %>% 
+  filter(group_id == "ko_fed") %>% 
+  left_join(sirt5_p, by = "metabolite")
+```
+
+#plot final
+```{r}
+#make labels df
+sig <- sirt5_plot %>% 
+  filter(normalized_control <= -0.5 | normalized_control >= 0.5) %>% 
+  filter(q.value < 0.001)
+
+#plot relative log2 fold change vs. p.value
+ggplot(sirt5_plot) +
+  geom_hline(aes(yintercept = 1.30103), linetype = "dotted") + #p.value 0.05
+  geom_vline(aes(xintercept = 1), linetype = "dotted") + #2FC
+  geom_vline(aes(xintercept = -1), linetype = "dotted") + #-2FC
+  geom_vline(aes(xintercept = 0)) + #bold axis
+  geom_hline(aes(yintercept = 0)) + #bold axis
+  geom_point(aes(x = normalized_control, y = -log(p.value, 10), fill = normalized_control), alpha = 0.8, size = 4, shape = 21, color = "black") +
+  geom_label_repel(data = sig, aes(x = normalized_control, y = -log(p.value, 10), label = metabolite), alpha = 0.8, size = 3, segment.size = 0.3, point.padding = 0.8) +
+  scale_fill_viridis(option = "viridis", direction = 1, name = expression("Log"[2]*"FC")) +
+  labs(x = expression("Relative fold change (log"[2]*") compared to control"), 
+       y = expression("-Log "[10]*" FDR corrected p-value"), 
+       title = "Metabolite profiling from wt and SIRT5KO cells in the fed state",
+       subtitle = "The influence of SIRT5 under basal conditions") +
+  theme_bw() + 
+  theme(
+    plot.title = element_text(face = "bold", size = 12),
+    legend.background = element_rect(fill = "white", size = 4, colour = "white"),
+    axis.ticks = element_line(colour = "grey70", size = 0.2),
+    panel.grid.major = element_line(colour = "grey70", size = 0.2),
+    panel.grid.minor = element_blank()
+  ) 
+
+#check top/bottom
+sirt5_plot %>% filter(group_id == "ko_fed") %>% head(plot, n = 10)
+sirt5_plot %>% filter(group_id == "ko_fed") %>% tail(plot, n = 10)
+
+```
+#save
+```{r}
+ggsave(here::here("2020_01", "results", "sirt5kocells_fed.png"), plot = last_plot(), device = "png", height = 6, width = 8, units = "in", dpi = 600)
+write_delim(sirt5_plot, here::here("2020_01", "results", "sirt5_fed.csv"), delim = ",", na = "")
+```
+
+#explore lysine metabolites
+```{r}
+sirt5_log %>% 
+  group_by(group_id) %>% 
+  summarize_if(is.numeric, mean)
+
+#long data for plotting
+sirt5_log_long <- sirt5_log %>% 
+  select(-sample) %>% 
+  pivot_longer(cols = -group_id, names_to = "metabolite", values_to = "normalized_control") %>% 
+  arrange(desc(normalized_control))
+
+#add factors back in
+sirt5_log_long <- sirt5_log_long %>% 
+  mutate(genotype_id = ifelse(str_detect(group_id, "wt"), "wt", "ko"))
+
+sirt5_log_long <- sirt5_log_long %>% 
+  mutate(status_id = ifelse(str_detect(group_id, "refed"), "refed", 
+            ifelse(str_detect(group_id, "starve"), "starved", 
+                   "fed"))) #order is important to differentiate str_detect 'fed' and 'refed', which contains 'fed' w/i
+
+sirt5_log_long$metabolite <- as.factor(sirt5_log_long$metabolite)
+sirt5_log_long$group_id <- as.factor(sirt5_log_long$group_id)
+
+lysine_metabolites <- factor(c("lysine", "L-2-aminoadipate", "glutaryl carnitine"), levels = c("lysine", "L-2-aminoadipate", "glutaryl carnitine"))
+
+lysine_metabolites_complete <- factor(c("lysine", "L-2-aminoadipate", "glutaryl carnitine", "3-Hydroxybutyrylcarnitine", "acetyl-CoA"), levels = c("lysine", "L-2-aminoadipate", "glutaryl carnitine", "3-Hydroxybutyrylcarnitine", "acetyl-CoA"))
+
+
+sirt5_log_long %>% 
+  filter(metabolite %in% lysine_metabolites) %>% 
+  ggplot() +
+  geom_boxplot(aes(factor(genotype_id, levels = c("wt", "ko"), labels = c("WT", "SIRT5KO")), normalized_control, fill = group_id)) +
+  facet_wrap(~ factor(metabolite, levels = lysine_metabolites) + factor(status_id, levels = c("fed", "starved", "refed"), labels = c("Fed", "Fasted", "Refed")), scales = "free", ncol = 3) +
+  #coord_flip() +
+  scale_fill_viridis(discrete = TRUE) +
+  theme_minimal() +
+  labs(
+    x = "", 
+    y = "Normalized Metablite Signal",
+    title = "Lysine Metaoblites in SIRT5KO Cells"
+  )
+  NULL
+
+ggsave(here::here("2020_01", "results", "sirt5kocells_lysine.png"), plot = last_plot(), device = "png", height = 8, width = 6, units = "in", dpi = 600)
+```
+
+```{r}
+#print Session information for provenance and reproducibility
+utils:::print.sessionInfo(sessionInfo()[-8]) 
+#You can remove an item from sessionInfo(), which is a list with a class attribute, by printing the resulting object omitting one of the list items (omitted list of packages installed, but not loaded)
+
+```
+
+#beep
+```{r}
+beep(sound = 8) #because mario is awesome
+```
+
+
