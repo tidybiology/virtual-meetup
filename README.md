@@ -13,6 +13,6 @@ each month from 4-5pm in the Winn Conference Room at the DMPI in Durham.
 All are welcome
 here.
 
-| Date         | Topic                                                      | Code                 |
-| ------------ | ---------------------------------------------------------- | -------------------- |
-| January 2020 | Building a volcano plot from non-targeted metabolomic data | [LINK](2020_01/code) |
+| Date         | Topic                                                      | Code                 | Recording |
+| ------------ | ---------------------------------------------------------- | -------------------- | -- |
+| January 2020 | Building a volcano plot from non-targeted metabolomic data | [LINK](2020_01/code) | [VIDEO](https://youtu.be/wkwFcDkbn28)
