@@ -1,0 +1,103 @@
+---
+title: "tidybiology january viz challenge"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+---
+Prism drug data
+
+##Load libraries
+```{r load_block, echo=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(here)
+library(janitor)
+library(beepr) #long analysis; get some coffee, and comeback when ready
+#clear environment
+#rm(list=ls()) 
+#how long?
+start_time <- Sys.time()
+```
+
+#import
+These are log-fold change collapsed replicates with outliers and controls removed
+```{r import}
+prism_url <- "https://ndownloader.figshare.com/files/17741420" #primary-screen-replicate-collapsed-logfold-change.csv
+prismmeta_url <- "https://ndownloader.figshare.com/files/20237715" #primary-screen-replicate-collapsed-treatment-info.csv
+
+prism <- read_csv(prism_url, col_names = TRUE) %>% 
+  clean_names()
+
+prism_long <- prism %>% 
+  #slice(1:10) %>% 
+  pivot_longer(cols = -x1, names_to = "drug", values_to = "log2fc")
+
+prism_meta <- read_csv(prismmeta_url, col_names = TRUE) %>% 
+  clean_names()
+```
+
+
+#eda
+```{r}
+ggplot(prism_meta) +
+  geom_histogram(aes(x = dose))
+ggplot(prism_long) +
+  geom_histogram(aes(x = log2fc))
+```
+
+#Join the datasets
+
+```{r join}
+prism_meta_new <- prism_meta %>% 
+                    mutate(drug_meta = str_to_lower(broad_id)) %>% 
+                    mutate(drug_meta = str_replace_all(drug_meta, "-", "_")) 
+prism_join <- prism_long %>% 
+                mutate(drug_short = str_sub(drug, 1, 22)) %>% 
+                left_join(prism_meta_new, by = c("drug_short" = "drug_meta")) 
+```
+
+#Make the plot
+
+```{r plot}
+prism_bigfc <- filter(prism_join, log2fc <= -2)
+ggplot(prism_bigfc, aes(x=phase, y=log2fc)) +
+  geom_jitter(aes(color= str_match(moa, "tubulin polymerization inhibitor")), alpha = 0.1) 
+ggplot(prism_bigfc, aes(x=phase, y=log2fc)) +
+  geom_jitter(aes(color= str_match(moa, "tubulin polymerization inhibitor")), alpha = 0.1) +
+  scale_color_manual(values = c("darkred")) +
+  guides(color = "none") +
+  theme_bw() +
+  labs(x = "Phase",
+       title = "Rainfall Plot",
+       subtitle = "Plotting Prism data",
+       caption = "By: [Insert your name]")
+```
+
+#how long?
+```{r}
+end_time <- Sys.time()
+time_taken <- round(as.duration(start_time %--% end_time)/dminutes(1), digits = 1)
+print(time_taken)
+```
+Approximate time to run was `r time_taken` minutes.
+
+#print Session information for provenance and reproducibility
+```{r}
+utils:::print.sessionInfo(sessionInfo()[-8]) 
+#You can remove an item from sessionInfo(), which is a list with a class attribute, by printing the resulting object omitting one of the list items (omitted list of packages installed, but not loaded)
+```
+#stamp
+```{r}
+lubridate::stamp("Data updated December 31, 1979")(now())
+```
+
+#beep
+```{r}
+beep(sound = 8) #because mario is awesome
+```
+
+
