@@ -1,0 +1,59 @@
+---
+title: "HPA Normalalized Tissue Expression Notebook"
+output: html_notebook
+---
+
+```{r setup}
+library(tidyverse)
+library(here)
+library(janitor)
+library(cowplot)
+#rm(list = ls())
+```
+
+#import RNA consensus tissue gene data
+Consensus transcript expression levels summarized per gene in 74 tissues based on transcriptomics data from three sources: HPA, GTEx and FANTOM5. The consensus normalized expression ("NX") value is calculated as the maximum NX value for each gene in the three data sources. For tissues with multiple sub-tissues (brain regions, blood cells, lymphoid tissues and intestine) the maximum of all sub-tissues is used for the tissue type. The tab-separated file includes Ensembl gene identifier ("Gene"), analysed sample ("Tissue") and normalized expression ("NX"). The data is based on The Human Protein Atlas version 19.2 and Ensembl version 92.38.
+
+You can eitehr download the file and place it in the data folder
+1. Download https://www.proteinatlas.org/download/rna_tissue_consensus.tsv.zip to the data folder  
+2. Unzip (double-click)  
+3. Confirm you see rna_tissue_consensus.tsv  
+
+Or you can run the code below to download the file each time
+
+```{r}
+
+url <- "https://www.proteinatlas.org/download/rna_tissue_consensus.tsv.zip"
+zip_file <- tempfile(fileext = ".zip")
+download.file(url, zip_file, mode = "wb")
+normalized_tissue <- read_tsv(zip_file) %>% 
+  clean_names()
+
+#uncomment this line to import from saved location
+#normalized_tissue <- read_tsv(here::here("data", "rna_tissue_consensus.tsv")) %>% clean_names()
+
+head(normalized_tissue)
+
+count(normalized_tissue, nx, sort = TRUE)
+
+ggplot(normalized_tissue) +
+  geom_histogram(aes(x = log10(nx)))
+```
+
+#yfg
+```{r}
+normalized_tissue %>% 
+  filter(gene_name == "SIRT4") %>% 
+  arrange(desc(nx))
+
+normalized_tissue %>% 
+  filter(gene_name == "SIRT4", 
+         nx > 2) %>% 
+  arrange(desc(nx)) %>% 
+  ggplot() +
+  geom_col(aes(x = fct_reorder(tissue, nx), y = nx)) +
+  coord_flip() + 
+  labs(title = "Tissue distribution of SIRT4 expression", x = "Normalized Expression", y = "") + 
+  theme_cowplot()
+```
+
