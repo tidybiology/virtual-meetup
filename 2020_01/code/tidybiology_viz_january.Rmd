@@ -52,6 +52,37 @@ ggplot(prism_long) +
   geom_histogram(aes(x = log2fc))
 ```
 
+#Join the datasets
+
+```{r join}
+prism_meta_new <- prism_meta %>% 
+                    mutate(drug_meta = str_to_lower(broad_id)) %>% 
+                    mutate(drug_meta = str_replace_all(drug_meta, "-", "_")) 
+
+prism_join <- prism_long %>% 
+                mutate(drug_short = str_sub(drug, 1, 22)) %>% 
+                left_join(prism_meta_new, by = c("drug_short" = "drug_meta")) 
+```
+
+#Make the plot
+
+```{r plot}
+prism_bigfc <- filter(prism_join, log2fc <= -2)
+
+ggplot(prism_bigfc, aes(x=phase, y=log2fc)) +
+  geom_jitter(aes(color= str_match(moa, "tubulin polymerization inhibitor")), alpha = 0.1) 
+
+ggplot(prism_bigfc, aes(x=phase, y=log2fc)) +
+  geom_jitter(aes(color= str_match(moa, "tubulin polymerization inhibitor")), alpha = 0.1) +
+  scale_color_manual(values = c("darkred")) +
+  guides(color = "none") +
+  theme_bw() +
+  labs(x = "Phase",
+       title = "Rainfall Plot",
+       subtitle = "Plotting Prism data",
+       caption = "By: [Insert your name]")
+```
+
 #how long?
 ```{r}
 end_time <- Sys.time()
