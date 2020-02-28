@@ -16,4 +16,4 @@ here.
 | Date          | Topic                                                      | Code                 | Recording                                            |
 | ------------- | ---------------------------------------------------------- | -------------------- | ---------------------------------------------------- |
 | January 2020  | Building a volcano plot from non-targeted metabolomic data | [LINK](2020_01/code) | [Video](https://www.youtube.com/watch?v=wkwFcDkbn28) |
-| February 2020 | Building visualizations from pharmacology data             | [LINK](2020_02/code) | [Video](https://www.youtube.com/watch?v=xiEkGakOQ_Q) |
+| February 2020 | Building visualizations from pharmacology data             | [LINK](2020_02/code) | [Video](https://youtu.be/xiEkGakOQ_Q?t=10)           |
