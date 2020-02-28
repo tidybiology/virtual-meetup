@@ -38,15 +38,24 @@ prism_long <- prism %>%
 
 prism_meta <- read_csv(prismmeta_url, col_names = TRUE) %>% 
   clean_names()
+
+head(prism)
+
+head(prism_long)
 ```
+
 
 
 #eda
 ```{r}
 ggplot(prism_meta) +
   geom_histogram(aes(x = dose))
+
 ggplot(prism_long) +
-  geom_histogram(aes(x = log2fc))
+  geom_histogram(aes(x = log2fc), bins = 50)
+
+ggplot(prism_long) +
+  geom_density(aes(x = log2fc))
 ```
 
 #Join the datasets
