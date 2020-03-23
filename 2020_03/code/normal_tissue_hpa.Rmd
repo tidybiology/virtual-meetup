@@ -59,3 +59,53 @@ normalized_tissue %>%
 
 ```
 
+#Plotting heatmaps
+
+```{r heatmap}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("ComplexHeatmap") # Run these three lines just once
+
+library(ComplexHeatmap)
+
+heatmap_df <- normalized_tissue %>% 
+                          pivot_wider(.,
+                          values_from = nx,
+                          names_from = tissue) 
+
+heatmap_df[is.na(heatmap_df)] <- 0 # for illustration purposes only! Imputation can be a fraught process
+heatmap_matrix <- as.matrix(heatmap_df[ , c(-1, -2)])
+heatmap_matrix <- scale(heatmap_matrix) # if you don't scale, the pancreas will form a cluster of its own!
+# This is because the pancreas shows such high expression compared to other organs
+
+# No tissue clusters
+Heatmap(heatmap_matrix, cluster_rows = FALSE, show_row_names = FALSE, show_heatmap_legend = FALSE,
+        border = TRUE, row_title = "Gene", column_title = "Tissue", column_title_side = "bottom",
+        cluster_columns = TRUE)
+
+set.seed(42) # reproducible randomness. K-means is a stochastic algorithm
+# Two clusters
+Heatmap(heatmap_matrix, cluster_rows = FALSE, show_row_names = FALSE, show_heatmap_legend = FALSE,
+        border = TRUE, row_title = "Gene", column_title = "Tissue", column_title_side = "bottom",
+        cluster_columns = TRUE, column_km = 2) # Brain tissues cluster together!
+
+# Three clusters
+Heatmap(heatmap_matrix, cluster_rows = FALSE, show_row_names = FALSE, show_heatmap_legend = FALSE,
+        border = TRUE, row_title = "Gene", column_title = "Tissue", column_title_side = "bottom",
+        cluster_columns = TRUE, column_km = 3)
+
+# And so on
+
+# As a challenge, repeat this with genes
+```
+
+
+
+
+
+
+
+
+
+
+
