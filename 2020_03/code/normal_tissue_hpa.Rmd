@@ -148,11 +148,11 @@ gganatogram(data=T5_plot, fillOutline='white', outline= T, organism='human', sex
   labs(title= "Sirt5 tissue expression", caption = "Sirt5 expression is highest in skeletal muscle and liver.")
 
 #Now you have a great gganatogram, let's save it!
-ggsave("output/SIRT5anatogram.png", last_plot())
+ggsave(here::here("2020_03", "results", "SIRT5anatogram.png"), last_plot())
 
 
 #Fix ratios
-ggsave("output/SIRT5anatogramFix.png", last_plot(), units = "in", width = 5, height = 7)
+ggsave(here::here("2020_03", "results", "SIRT5anatogram.png"), last_plot(), units = "in", width = 5, height = 7)
 
 ```
 
