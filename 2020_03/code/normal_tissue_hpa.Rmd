@@ -4,6 +4,10 @@ output: html_notebook
 ---
 
 ```{r setup}
+#install.packages("neurocInstall")
+library(neurocInstall)
+#neuro_install('gganatogram')
+library(gganatogram)
 library(tidyverse)
 library(here)
 library(janitor)
@@ -58,6 +62,104 @@ normalized_tissue %>%
 
 
 ```
+
+
+#gganatogram
+
+```{r}
+#On gganatograms site, one of the first things they instruct is as follows:
+#"In order to use the function gganatogram, you need to have a data frame with organ, colour, and value"
+
+organPlot <- data.frame(organ = c("heart", "leukocyte", "nerve", "brain", "liver", "stomach", "colon"), 
+ type = c("circulation", "circulation",  "nervous system", "nervous system", "digestion", "digestion", "digestion"), 
+ colour = c("red", "red", "blue", "blue", "purple", "orange", "orange"), 
+ value = c(10, 5, 1, 8, 2, 5, 5), 
+ stringsAsFactors=F)
+
+#Let's take a look!
+head(organPlot)
+```
+
+Alternatively, we can import a dataset already within gganatogram
+```{r}
+#First, we'll look at what datasets are available within the package
+library(help="gganatogram")
+
+#We're going to plot to a human male (since our dataset is human)
+data(hgMale_key)
+
+glimpse(hgMale_key)
+
+```
+
+Now we need to prepare our data to be compatable with gganatogram
+```{r}
+normalized_tissue$organ <- 0 #this is creating a new column
+normalized_tissue$organ <- str_replace(normalized_tissue$tissue, " ", "_") #reformatting to fit hgMale_key format
+
+#now we'll join the hgMale_key with our dataset by our new variable
+norm_tiss_plot <- full_join(normalized_tissue, hgMale_key, by= c("organ"))
+
+nx_plot<- norm_tiss_plot %>% select(- value) #removing value from original hgMale_key data
+
+nx_plot$value <- nx_plot$nx #here I copied our normal expression values to the new "value" column, because this is the information gganatogram needs. I could have just renamed the column, but here it is just copied. 
+```
+
+```{r}
+
+#filter our data for your gene of interest
+T5_plot<- nx_plot %>% 
+  filter(gene_name == "SIRT5") %>% 
+  filter(!is.na(type)) %>% #sorting out any that do not have tissue type association
+  arrange(desc(nx)) 
+
+#First, let's see what gganatogram does by default
+gganatogram(data=T5_plot, organism='human', sex='male', fill="value")
+```
+
+Let's start to customize our plot. To see gganatogram information, you can go to this site: https://jespermaag.github.io/blog/2018/gganatogram/ 
+
+```{r}
+#first, let's change the color of the human base
+gganatogram(data=T5_plot, fillOutline='white', organism='human', sex='male', fill="value")
+
+#now we're going to remove the outline, including face
+gganatogram(data=T5_plot, fillOutline='white', outline= F, organism='human', sex='male', fill="value")
+```
+
+We can add common ggplot functions to our anatogram
+```{r}
+#Let's begin with the theme
+gganatogram(data=T5_plot, fillOutline='white', outline= F, organism='human', sex='male', fill="value") + 
+  theme_void()
+
+#And color
+gganatogram(data=T5_plot, fillOutline='white', outline= T, organism='human', sex='male', fill="value") + 
+  theme_void()+
+  scale_fill_gradient(low = "white", high = "red")
+
+#Note, you can even use the viridis package for this scaling. Just use the scale_color_viridis() function. (And don't forget to load the viridis library)
+
+
+#To finish off our graph, let's go ahead and add some labels                      
+gganatogram(data=T5_plot, fillOutline='white', outline= T, organism='human', sex='male', fill="value") + 
+  theme_void()+
+  scale_fill_gradient(low = "white", high = "red")+
+  labs(title= "Sirt5 tissue expression", caption = "Sirt5 expression is highest in skeletal muscle and liver.")
+
+#Now you have a great gganatogram, let's save it!
+ggsave(here::here("2020_03", "results", "SIRT5anatogram.png"), last_plot())
+
+
+#Fix ratios
+ggsave(here::here("2020_03", "results", "SIRT5anatogram.png"), last_plot(), units = "in", width = 5, height = 7)
+
+```
+
+If you enjoyed the gganatograms, know that they also make plots for mice and other organisms!
+
+
+
 
 #Plotting heatmaps
 
