@@ -5,7 +5,7 @@ output: html_notebook
 
 ```{r setup}
 #install.packages("neurocInstall")
-library(neurocInstall)
+#library(neurocInstall)
 #neuro_install('gganatogram')
 library(gganatogram)
 library(tidyverse)
@@ -180,11 +180,13 @@ heatmap_matrix <- as.matrix(heatmap_df[ , c(-1, -2)])
 heatmap_matrix <- scale(heatmap_matrix) # if you don't scale, the pancreas will form a cluster of its own!
 # This is because the pancreas shows such high expression compared to other organs
 
+# Heatmap of gene expression across vaarious tissues
 # No tissue clusters
 Heatmap(heatmap_matrix, cluster_rows = FALSE, show_row_names = FALSE, show_heatmap_legend = FALSE,
         border = TRUE, row_title = "Gene", column_title = "Tissue", column_title_side = "bottom",
         cluster_columns = TRUE)
 
+# set the seed of R's random number generator
 set.seed(42) # reproducible randomness. K-means is a stochastic algorithm
 # Two clusters
 Heatmap(heatmap_matrix, cluster_rows = FALSE, show_row_names = FALSE, show_heatmap_legend = FALSE,
