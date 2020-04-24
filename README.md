@@ -17,3 +17,4 @@ All are welcome here.
 | January 2020  | Building a volcano plot from non-targeted metabolomic data              | [LINK](2020_01/code) | [Video](https://www.youtube.com/watch?v=wkwFcDkbn28) |
 | February 2020 | Building visualizations from pharmacology data                          | [LINK](2020_02/code) | [Video](https://youtu.be/xiEkGakOQ_Q?t=10)           |
 | March 2020    | Exploring a gene expression tissue dataset from the Human Protein Atlas | [LINK](2020_03/code) | [Video](https://youtu.be/UD5qITGy_nw)                |
+| April 2020    | Visualizing COVID19 spread across the US                                | [LINK](2020_04/code) | [Video](https://youtube.com)                         |
