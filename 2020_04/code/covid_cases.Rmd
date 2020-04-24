@@ -1,0 +1,126 @@
+---
+title: "Mapping COVID-19 cases by State"
+author: ""
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(geojsonio)
+library(rgeos)
+library(viridis)
+library(rgdal)
+library(gganimate)
+library(transformr)
+library(tweenr)
+library(broom)
+library(gghighlight)
+```
+
+# EDA
+
+```{r eda, echo = FALSE, include = TRUE, warning = FALSE, message = FALSE}
+# download data from NYT Github repository
+url <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv"
+states <- read_csv(url)
+
+# line plot to see increase in case numbers over time, with New York state highlighted
+states %>% 
+  ggplot(aes(date, log2(cases), colour = state)) +
+  geom_line() +
+  theme(legend.position = "none") +
+  gghighlight(state == "New York")
+# this is a crowded plot
+```
+
+# Static Choropleth Map
+
+```{r static plot, echo = FALSE, include = TRUE, warning = FALSE, message = FALSE}
+# Walkthrough from -
+# https://www.r-graph-gallery.com/328-hexbin-map-of-the-usa.html
+
+# Download the Hexagones boundaries at geojson format here: https://team.carto.com/u/andrew/tables/andrew.us_states_hexgrid/public/map.
+
+# load the geojson file that provides the boundaries of US states as hexagons
+spdf <- geojson_read("us_states_hexgrid.geojson",  what = "sp") 
+# spdf is an S4 object that contains various slots. Same object type used by GEO and Bioconductor, for example
+# spdf@data
+
+# remove the `(United States)` portion at the end of each state's name
+spdf@data = spdf@data %>% mutate(google_name = gsub(" \\(United States\\)", "", google_name))
+# need to 'fortify' the data to be able to show it with ggplot2 (we need a data frame format). We use the tidy function from the broom package
+spdf_fortified <- tidy(spdf, region = "google_name")
+
+# Calculate the centroid of each hexagon (by using the gCentroid function) to add the label
+centers <- data.frame(gCentroid(spdf, byid=TRUE), id=spdf@data$iso3166_2)
+
+# join `spdf_fortified` with `states`
+spdf_covid <- spdf_fortified %>%
+  left_join(states, by=c("id"="state")) 
+
+# create bins for your legend
+spdf_covid <- spdf_covid %>% 
+                mutate(bin = case_when(
+                  cases < 500 ~ "<500",
+                  cases > 500 & cases < 1000 ~ "500-1000",
+                  cases > 1000 & cases < 2000 ~ "1000-2000",
+                  cases > 2000 & cases < 5000 ~ "2000-5000",
+                  cases > 5000 & cases < 10000 ~ "5000-10000",
+                  cases > 10000 & cases < 20000 ~ "10000-20000",
+                  cases > 20000 & cases < 40000 ~ "20000-40000",
+                  cases > 40000 & cases < 60000 ~ "40000-80000",
+                  cases > 80000 & cases < 100000 ~ "80000-100000",
+                  cases > 100000 ~ "100000+"
+                ))
+spdf_covid$bin <- factor(spdf_covid$bin, levels = c("<500", "500-1000", "1000-2000", "2000-5000", "5000-10000", "10000-20000", "20000-40000", "40000-80000", "80000-100000", "100000+"))
+
+ggplot() +
+  geom_polygon(data = filter(spdf_covid, date == max(date)), aes(fill = bin, x = long, y = lat, group = id), size=0, alpha=0.9) +
+  geom_text(data=centers, aes(x=x, y=y, label=id), color="white", size=3, alpha=0.6) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    text = element_text(color = "#22211d"),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA), 
+    panel.background = element_rect(fill = "#f5f5f2", color = NA), 
+    legend.background = element_rect(fill = "#f5f5f2", color = NA),
+    plot.title = element_text(size= 22, hjust=0.5, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+  ) +
+  scale_fill_viridis_d() +
+  labs(title = "A map of COVID-19 cases, state by state",
+       subtitle = paste0("Date:", max(spdf_covid$date)),
+       caption = "Data Source: The New York Times",
+       fill = "")
+
+#ggsave("covid_cases.png")
+```
+
+# Animated Choropleth Map
+
+```{r gganimate, echo = FALSE, include = TRUE, warning = FALSE, message = FALSE}
+ggplot() +
+  geom_polygon(data=spdf_covid, aes(fill = bin, x = long, y = lat, group = id), size=0, alpha=0.9) +
+  geom_text(data=centers, aes(x=x, y=y, label=id), color="white", size=3, alpha=0.6) +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    text = element_text(color = "#22211d"),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA), 
+    panel.background = element_rect(fill = "#f5f5f2", color = NA), 
+    legend.background = element_rect(fill = "#f5f5f2", color = NA),
+    plot.title = element_text(size= 22, hjust=0.5, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+  ) +
+  scale_fill_viridis_d() +
+  labs(title = "A map of COVID-19 cases, state by state",
+       subtitle = 'Date: {frame_time}',
+       caption = "Data Source: The New York Times",
+       fill = "") +
+  transition_time(date) +
+  enter_fade() +
+  exit_fade() -> p
+
+animate(p, end_pause = 24)
+```
+
