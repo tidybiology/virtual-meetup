@@ -1,0 +1,93 @@
+---
+title: "Using enrichR and pathview packages for pathway analysis"
+author: ""
+date: "5/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+#install.packages("enrichR")
+library(enrichR)
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# BiocManager::install("pathview")
+library(pathview)
+# BiocManager::install("org.Mm.eg.db")
+library(org.Mm.eg.db)
+# BiocManager::install("EBImage")
+library(EBImage)
+library(here)
+```
+
+# Load data
+```{r load data}
+data <- read_csv(here::here("2020_05", "data" ,"data.csv")) 
+
+dim(data)
+
+glimpse(data)
+
+View(data)
+```
+
+# Pathway analysis with enrichR
+```{r enrichr}
+# What functions does the enrichr package contain?
+lsf.str("package:enrichR") # only three functions
+dbs <- listEnrichrDbs() # but 166 databases!
+View(dbs)
+
+databases <- c("KEGG_2019_Mouse", "GO_Molecular_Function_2018", "GO_Biological_Process_2018")
+
+data %>% 
+  filter(log2FoldChange > 0) %>% 
+  pull(GeneName) -> upregulated
+
+enriched_up <- enrichr(upregulated, databases)
+View(enriched_up)
+
+head(enriched_up["KEGG_2019_Mouse"]) # insulin signaling pathway looks interesting
+```
+
+# Visualizing the insulin signaling pathway using pathview
+```{r pathview}
+data %>% 
+  filter(log2FoldChange > 0) %>% 
+  mutate(gene_id = mapIds(org.Mm.eg.db, GeneName, "ENTREZID", "SYMBOL")) %>% 
+  drop_na() -> upregulated_with_id
+
+upregulated_with_id %>% 
+  dplyr::select(log2FoldChange) -> fc
+
+rownames(fc) <- upregulated_with_id$gene_id # Setting row names on a tibble is deprecated.non-unique value when setting 'row.names': ‘194401’Error in `.rowNamesDF<-`(x, value = value) : duplicate 'row.names' are not allowed
+length(upregulated_with_id$gene_id) # 2146
+length(unique(upregulated_with_id$gene_id)) # 2145
+# One duplicate entry! Which one is it?
+upregulated_with_id[duplicated(upregulated_with_id$gene_id),] # Mical3 has two entries!
+
+# Repeat but drop the second Mical3 entry
+
+data %>% 
+  filter(log2FoldChange > 0) %>% 
+  mutate(gene_id = mapIds(org.Mm.eg.db, GeneName, "ENTREZID", "SYMBOL")) %>% 
+  drop_na() %>% 
+  distinct(gene_id, .keep_all = TRUE) -> upregulated_with_id # if you forget to set `.keep_all` to TRUE, you will end up with a dataframe with just one column i.e. `gene_id`
+upregulated_with_id %>% 
+  dplyr::select(log2FoldChange) -> fc
+
+rownames(fc) <- upregulated_with_id$gene_id
+
+# Native KEGG view
+pathview(gene.data = fc, pathway.id = "04910", species = "mmu", out.suffix = "upregulated", kegg.native = T) 
+
+# View image
+img <- readImage(here::here("2020_05", "results" ,"mmu04910.upregulated.png"))
+display(img, method = "raster")
+
+# Thorough and well-done vignette - https://bioconductor.org/packages/release/bioc/vignettes/pathview/inst/doc/pathview.pdf
+```
+
+
+
