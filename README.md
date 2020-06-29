@@ -18,4 +18,5 @@ All are welcome here.
 | February 2020 | Building visualizations from pharmacology data                          | [LINK](2020_02/code) | [Video](https://youtu.be/xiEkGakOQ_Q?t=10)           |
 | March 2020    | Exploring a gene expression tissue dataset from the Human Protein Atlas | [LINK](2020_03/code) | [Video](https://youtu.be/UD5qITGy_nw)                |
 | April 2020    | Visualizing COVID19 spread across the US                                | [LINK](2020_04/code) | [Video](https://youtu.be/aR-TN1EbPmI?t=50)           |
-| May 2020      | Using enrichR and pathview packages for pathway analysis                | [LINK](2020_05/code) | [Video](https://youtube.com)                         |
+| May 2020      | Using enrichR and pathview packages for pathway analysis                | [LINK](2020_05/code) | [Video](https://youtu.be/_jGM2NhToGY)                |
+| June 2020     | How to make a personal website with R and blogdown                      | No code this month   | [Video](https://youtu.be/IMI_JDTJcts)                |
