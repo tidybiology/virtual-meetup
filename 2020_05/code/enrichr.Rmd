@@ -58,10 +58,10 @@ head(enriched_up["KEGG_2019_Mouse"]) # insulin signaling pathway looks interesti
    mutate(gene_id = mapIds(org.Mm.eg.db, GeneName, "ENTREZID", "SYMBOL")) %>% 
    drop_na() -> upregulated_with_id
 # 
-# upregulated_with_id %>% 
-#   dplyr::select(log2FoldChange) -> fc
+upregulated_with_id %>% 
+  dplyr::select(log2FoldChange) -> fc
 
-#rownames(fc) <- upregulated_with_id$gene_id # Setting row names on a tibble is deprecated.non-unique value when setting 'row.names': ‘194401’Error in `.rowNamesDF<-`(x, value = value) : duplicate 'row.names' are not allowed
+rownames(fc) <- upregulated_with_id$gene_id # Setting row names on a tibble is deprecated.non-unique value when setting 'row.names': ‘194401’Error in `.rowNamesDF<-`(x, value = value) : duplicate 'row.names' are not allowed
 length(upregulated_with_id$gene_id) # 2146
 length(unique(upregulated_with_id$gene_id)) # 2145
 # One duplicate entry! Which one is it?
