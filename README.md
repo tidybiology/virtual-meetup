@@ -1,16 +1,15 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# tidybiology meetup
+# \[virtual\] meetup
 
-![tidybiology](README_files/figure-gfm/tidybiology_channel_art.png)
+![banner](README_files/figure-gfm/tidybiology_channel_art.png)
 <!-- badges: start --> <!-- badges: end -->
 
-This is a repository for the tidybiology meetup beginning January 2020.
-The goals of tidybiology meetups are to continue learning R and to
-elevate data literacy among biologists. We meet on the last Monday of
-each month from 4-5pm in the Winn Conference Room at the DMPI in Durham.
-All are welcome here.
+This is a repository for the a meetup series beginning January 2020. The
+goals of meetups are to continue learning R and to elevate data literacy
+among biologists. We meet on the last Monday of each month from 4-5pm in
+the Winn Conference Room at the DMPI in Durham. All are welcome here.
 
 | Date          | Topic                                                                   | Code                 | Recording                                            |
 | ------------- | ----------------------------------------------------------------------- | -------------------- | ---------------------------------------------------- |
@@ -20,3 +19,4 @@ All are welcome here.
 | April 2020    | Visualizing COVID19 spread across the US                                | [LINK](2020_04/code) | [Video](https://youtu.be/aR-TN1EbPmI?t=50)           |
 | May 2020      | Using enrichR and pathview packages for pathway analysis                | [LINK](2020_05/code) | [Video](https://youtu.be/_jGM2NhToGY)                |
 | June 2020     | How to make a personal website with R and blogdown                      | No code this month   | [Video](https://youtu.be/IMI_JDTJcts)                |
+| July 2020     | How to perform differential gene expression analysis with limma         | [LINK](2020_07/code) | [Video](https://youtu.be)                            |
