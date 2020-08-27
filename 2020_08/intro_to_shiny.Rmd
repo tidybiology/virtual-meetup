@@ -1,0 +1,210 @@
+---
+title: "Using Shiny for Big Data Analysis"
+author: "Matthew Hirschey and Akshay Bareja"
+date: "8/31/2020"
+output: 
+  ioslides_presentation:
+    incremental: true
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(shiny)
+df <- read_csv("df.csv")
+genes <- pull(df, Gene.symbol)
+```
+
+## What is Shiny? {.build}
+
+- Shiny is an R package that allows you to make interactive apps using R  
+- These apps can be run on your computer, hosted as stand-alone apps, or can be embedded in a webpage  
+- Think of this as R's version of Tableau  
+
+## What kind of apps can you make with Shiny?
+
+<iframe src="https://shiny.rstudio.com/gallery/#demos" width="100%" height="90%"></iframe>
+
+## How does a Shiny App work? {.build}
+
+- A Shiny app is made up of three components - a user interface section, a server section, and a function to launch the app
+- When a user makes some change or enters some input, the app produces the required output (like a graph or table)
+
+## Let's build an app! {.build}
+
+- Using the same microarray dataset we looked at in a previous meetup, let's make an app that plots individual expression values for an input gene
+- The user selects a particular gene from a dropdown menu, and the app plots the corresponding graph
+
+##
+```{r, echo = FALSE}
+shinyApp(
+ui <- fluidPage(
+    titlePanel("Outlier Detector"),
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("gene", "Gene:", 
+                        choices = genes)
+        ),
+        mainPanel(
+           plotOutput("plot")
+        )
+    )
+),
+
+server <- function(input, output) {
+    
+    output$plot <- renderPlot({
+       df %>% 
+            filter(Gene.symbol == input$gene) %>% 
+            pivot_longer(cols = contains("GSM"),
+                         names_to = "Sample",
+                         values_to = "Expression") %>% 
+            ggplot(aes(Sample, Expression)) +
+            geom_point(col = "darkblue", size = 5) +
+            theme_bw()
+    })
+}
+)
+```
+
+## UI code
+
+```{r ui code, eval = FALSE, echo = TRUE, warning = FALSE, message = FALSE}
+library(shiny)
+library(tidyverse)
+
+df <- read_csv("df.csv")
+genes <- pull(df, Gene.symbol)
+
+ui <- fluidPage(
+    titlePanel("Outlier Detector"),
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("gene", "Gene:", 
+                        choices = genes)
+             # `gene` "smuggles" the selected gene name to the server side
+        ),
+        mainPanel(
+           plotOutput("plot")
+        )
+    )
+)
+```
+
+## Server code
+```{r server code, eval = FALSE, echo = TRUE}
+server <- function(input, output) {
+
+    output$plot <- renderPlot({
+       df %>% 
+            filter(Gene.symbol == input$gene) %>% 
+            pivot_longer(cols = contains("GSM"),
+                         names_to = "Sample",
+                         values_to = "Expression") %>% 
+            ggplot(aes(Sample, Expression)) +
+            geom_point(col = "darkblue", size = 5) +
+            theme_bw()
+       # The output of this code gets assigned to `plot` which is 
+       # sent back to the UI side
+    })
+}
+```
+
+## Run the app
+```{r run the app, eval = FALSE, echo = TRUE}
+shinyApp(ui = ui, server = server)
+```
+
+## Adding another reactive element is very simple
+
+##
+```{r, echo = FALSE}
+shinyApp(
+ui <- fluidPage(
+    titlePanel("Outlier Detector"),
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("gene", "Gene:", 
+                        choices = genes)
+        ),
+        mainPanel(
+           textOutput("text"),
+           plotOutput("plot")
+        )
+    )
+),
+
+server <- function(input, output) {
+    
+    output$plot <- renderPlot({
+       df %>% 
+            filter(Gene.symbol == input$gene) %>% 
+            pivot_longer(cols = contains("GSM"),
+                         names_to = "Sample",
+                         values_to = "Expression") %>% 
+            ggplot(aes(Sample, Expression)) +
+            geom_point(col = "darkblue", size = 5) +
+            theme_bw()
+    })
+    
+    output$text <- renderText({
+      paste0("Expression levels for gene: ", input$gene)
+    })
+}
+)
+```
+
+## UI code
+```{r, eval = FALSE, echo = TRUE, warning = FALSE, message = FALSE}
+library(shiny)
+library(tidyverse)
+
+df <- read_csv("df.csv")
+genes <- pull(df, Gene.symbol)
+
+ui <- fluidPage(
+    titlePanel("Outlier Detector"),
+    sidebarLayout(
+        sidebarPanel(
+            selectInput("gene", "Gene:", 
+                        choices = genes)
+        ),
+        mainPanel(
+           textOutput("text"), # new code
+           plotOutput("plot") 
+        )
+    )
+)
+```
+
+## Server code
+```{r, eval = FALSE, echo = TRUE}
+server <- function(input, output) {
+    
+    output$plot <- renderPlot({
+       df %>% 
+            filter(Gene.symbol == input$gene) %>% 
+            pivot_longer(cols = contains("GSM"),
+                         names_to = "Sample",
+                         values_to = "Expression") %>% 
+            ggplot(aes(Sample, Expression)) +
+            geom_point(col = "darkblue", size = 5) +
+            theme_bw()
+    })
+    
+    output$text <- renderText({ # new code
+      paste0("Expression levels for gene:", input$gene) # new code
+    }) # new code
+}
+```
+
+## To run app, open `app.R` in RStudio and click `Run App`
+
+## What is reactivity?
+
+<iframe src="https://shiny.rstudio.com/articles/understanding-reactivity.html" width="100%" height="100%"></iframe>
+
+## Using Shiny apps in publications
+
+https://twc-stanford.shinyapps.io/aging_plasma_proteome/" 
