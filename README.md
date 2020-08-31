@@ -20,3 +20,4 @@ the Winn Conference Room at the DMPI in Durham. All are welcome here.
 | May 2020      | Using enrichR and pathview packages for pathway analysis                | [LINK](2020_05/code) | [Video](https://youtu.be/_jGM2NhToGY)                |
 | June 2020     | How to make a personal website with R and blogdown                      | No code this month   | [Video](https://youtu.be/IMI_JDTJcts)                |
 | July 2020     | How to perform differential gene expression analysis with limma         | [LINK](2020_07/code) | [Video](https://youtu.be)                            |
+| August 2020   | How to build a Shiny app                                                | [LINK](2020_08/code) | [Video](https://youtu.be)                            |
