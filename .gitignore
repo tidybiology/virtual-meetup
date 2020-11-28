@@ -5,7 +5,7 @@
 *.Rproj
 /video
 /tmp
-
+*/tmp/
 # OS generated files #
 ######################
 .DS_Store

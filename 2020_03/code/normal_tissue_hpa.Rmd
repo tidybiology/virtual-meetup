@@ -134,7 +134,7 @@ gganatogram(data=T5_plot, fillOutline='white', outline= F, organism='human', sex
   theme_void()
 
 #And color
-gganatogram(data=T5_plot, fillOutline='white', outline= T, organism='human', sex='male', fill="value") + 
+gganatogram(data=T5_plot, fillOutline='white', outline= F, organism='human', sex='male', fill="value") + 
   theme_void()+
   scale_fill_gradient(low = "white", high = "red")
 
@@ -142,7 +142,7 @@ gganatogram(data=T5_plot, fillOutline='white', outline= T, organism='human', sex
 
 
 #To finish off our graph, let's go ahead and add some labels                      
-gganatogram(data=T5_plot, fillOutline='white', outline= T, organism='human', sex='male', fill="value") + 
+gganatogram(data=T5_plot, fillOutline='white', outline= F, organism='human', sex='male', fill="value") + 
   theme_void()+
   scale_fill_gradient(low = "white", high = "red")+
   labs(title= "Sirt5 tissue expression", caption = "Sirt5 expression is highest in skeletal muscle and liver.")
