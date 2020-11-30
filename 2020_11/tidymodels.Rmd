@@ -1,0 +1,182 @@
+---
+title: "Analyzing the palmer penguins dataset using tidymodels"
+author: ""
+date: "11/30/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidymodels)
+library(palmerpenguins)
+library(tidyverse)
+theme_set(theme_minimal())
+```
+
+# Principal Component Analysis
+
+All of the following PCA code has been copied from - https://allisonhorst.github.io/palmerpenguins/articles/articles/pca.html
+
+For more information on the palmerpenguins dataset (and adorable artwork!), please refer to - https://allisonhorst.github.io/palmerpenguins/
+
+For another wonderful PCA walkthrough (on cocktails!), you can refer to this blog post and recording by Julia Silge - https://juliasilge.com/blog/cocktail-recipes-umap/
+
+Tidymodels website - https://www.tidymodels.org
+Tidymodels book (by Max Kuhn and Julia Silge) - https://www.tmwr.org
+
+```{r pca_recipe}
+# load data
+data(penguins)
+
+# create a recipe
+penguin_recipe <-
+  recipe(~., data = penguins) %>% 
+  update_role(year, species, island, sex, new_role = "id") %>% 
+  step_naomit(all_predictors()) %>% 
+  step_normalize(all_predictors()) %>%
+  step_pca(all_predictors(), id = "pca") %>% 
+  prep()
+
+penguin_recipe
+
+tidy(penguin_recipe)
+tidy(penguin_recipe, id = "pca") # this is equivalent to
+tidy(penguin_recipe, 3)
+```
+
+Plot principal components
+
+```{r plot_pcs}
+penguin_recipe %>%
+  tidy(id = "pca") %>% 
+  mutate(component = fct_inorder(component)) %>% 
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
+
+Plot PCA loadings and scores
+```{r biplot}
+penguin_pca <- 
+  penguin_recipe %>% 
+  tidy(id = "pca") 
+
+# get pca loadings into wider format
+pca_wider <- penguin_pca %>% 
+               pivot_wider(names_from = component, id_cols = terms)
+pca_wider
+
+# We also need to go back to our prepped penguin recipe, prepped_penguins, 
+# and recipes::juice() it to get the PCA scores back.
+penguin_recipe
+juice(penguin_recipe)
+
+pca_plot <-
+  juice(penguin_recipe) %>%
+  ggplot(aes(PC1, PC2)) +
+  geom_point(aes(color = species, shape = species), 
+             alpha = 0.8, 
+             size = 2) +
+  scale_colour_manual(values = c("darkorange","purple","cyan4"))
+pca_plot
+
+# define arrow style
+arrow_style <- arrow(length = unit(.05, "inches"),
+                     type = "closed")
+pca_plot +
+  geom_segment(data = pca_wider,
+               aes(xend = PC1, yend = PC2), 
+               x = 0, 
+               y = 0, 
+               arrow = arrow_style) + 
+  geom_text(data = pca_wider,
+            aes(x = PC1, y = PC2, label = terms), 
+            hjust = 0, 
+            vjust = 1,
+            size = 5, 
+            color = '#0A537D') # confirms that penguins with longer flippers, higher body mass, and longer bill length,
+# have shorter bill depth
+
+# This scatter plot confirms this
+penguins %>% 
+  ggplot(aes(x = body_mass_g, y = bill_depth_mm, colour = species)) +
+  geom_point() +
+  scale_colour_manual(values = c("darkorange","purple", "cyan4")) 
+```
+
+# Logistic regression
+
+Create a smaller dataset with Chinstrap penguins filtered out
+```{r no_chinstrap}
+penguins_small <- penguins %>% 
+                    filter(species %in% c("Adelie", "Gentoo")) 
+# Note: `species` still has THREE levels
+levels(penguins_small$species)
+
+penguins_small$species <- factor(penguins_small$species, levels = c("Adelie", "Gentoo"))
+
+# to confirm this worked
+levels(penguins_small$species)
+```
+
+Split data
+```{r split}
+# Split data into "training" and "testing"
+set.seed(42)
+# Put 3/4 of the data into the training set 
+data_split <- initial_split(penguins_small, prop = 3/4)
+
+# Create data frames for the two sets:
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+```
+
+Create recipe and fit model
+```{r recipe_model}
+penguins_rec <- recipe(species ~ bill_depth_mm, data = train_data) 
+summary(penguins_rec)  
+
+# Fit a model with a recipe
+# we start by building a model specification using the parsnip package
+lr_mod <- 
+  logistic_reg() %>% 
+  set_engine("glm")
+
+penguins_wflow <- 
+  workflow() %>% 
+  add_model(lr_mod) %>% 
+  add_recipe(penguins_rec)
+penguins_wflow
+
+# Now, there is a single function that can be used to prepare the recipe and train the model from the resulting predictors:
+penguins_fit <- penguins_wflow %>% 
+  fit(data = train_data)
+
+penguins_fit %>% 
+  pull_workflow_fit() %>% 
+  tidy()
+```
+
+Make predictions
+```{r predict}
+predict(penguins_fit, test_data)
+
+penguins_pred <- 
+  predict(penguins_fit, test_data, type = "prob") %>% 
+  bind_cols(test_data %>% select(species, bill_length_mm)) 
+penguins_pred
+```
+
+Evaluate model performance
+```{r roc}
+# plot roc curve
+penguins_pred %>% 
+  roc_curve(truth = species, .pred_Adelie) %>% 
+  autoplot()
+
+# calculate auroc
+penguins_pred %>% 
+  roc_auc(truth = species, .pred_Adelie)
+```
+
